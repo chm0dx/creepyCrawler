@@ -1,0 +1,509 @@
+#!/usr/bin/env python3
+
+import ast
+import json
+import re
+import requests
+import sys
+import threading
+import time
+
+from bs4 import BeautifulSoup
+from fireprox import fire
+from queue import Queue
+from requests.packages import urllib3
+
+
+class CreepyCrawler():
+	def __init__(self,**kwargs):
+		urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+		self.suppress_progress = True
+		self.files = []
+		self.emails = []
+		self.social_links = []
+		self.sub_domains = []
+		self.interesting = []
+		self.processed = []
+		self.alerts = []
+		self.socials = ["youtube.com","facebook.com","instagram.com","linkedin.com","twitter.com","github.com"]
+		self.socials_ignore = ["help.github.com","linkedin.com/redir","facebook.com/dialog","linkedin.com/feed/hashtag","linkedin.com/cws","twitter.com/hashtag","facebook.com/sharer","twitter.com/intent","twitter.com/home?status=","facebook.com/sharer.php","facebook.com/share.php","linkedin.com/shareArticle","youtube.com/ads","youtube.com/about","youtube.com/creators","youtube.com/howyoutubeworks","google.com/youtube","twitter.com/share","twitter.com/privacy","linkedin.com/static","linkedin.com/learning","help.instagram.com","facebook.com/policy.php","facebook.com/help","facebook.com/about","facebook.com/ads","developers.facebook.com"]
+		self.file_extensions = [".pdf",".docx",".doc",".xlsx",".xls",".pptx",".ppt",".exe",".zip",".7z",".7zip","pkg","deb"]
+		self.media_files_ignore = [".png",".gif",".jpg"]
+		self.file_content_types = ["application/pdf"]
+		self.interesting_content_types = ["application/json"]
+		self.cf_strings = ["Checking if the site connection is secure","Attention Required!", "Just a moment..."]
+		self.fp_requests = []
+		self.fp_urls = {}
+		self.queue = Queue()
+		self.done = threading.Event()
+		self.__dict__.update(kwargs)
+		self.base_domain = ".".join(self.url.split("/")[-1].split(".")[-2:])
+		self.email_domains = self.email or self.base_domain
+		self.email_domains = self.email_domains.split(",")
+
+		if self.headers:
+			self.headers = ast.literal_eval(self.custom_headers)
+		else:
+			self.headers = {'user-agent':'Screaming Frog SEO Spider/6.2'}
+		if self.proxy:
+			self.proxy = {"http":self.proxy,"https":self.proxy}
+		if "https://" not in self.url and "http://" not in self.url:
+			self.url = f"http://{self.url}"
+		if self.fireprox:
+			self.fp = fire.FireProx(
+				region=self.region,
+				access_key=self.access_key,
+				secret_access_key=self.secret_access_key
+			)
+			self.headers["X-My-X-Forwarded-For"] = "86.75.30.9"
+			self.fp_done = threading.Event()
+			threading.Thread(target=self.manage_fp,args=(),daemon=True).start()
+
+
+	def manage_fp(self):
+		while not self.done.is_set():
+			while self.fp_requests:
+				requested_url = self.fp_requests.pop()
+				if not self.fp_urls.get(requested_url):
+					if not self.suppress_progress:
+						print(f"Creating FireProx endpoint for {requested_url}...")
+					fp_url = re.search(r"=> (.*) ", self.fp.create_api(requested_url))[1]
+					self.fp_urls[requested_url] = fp_url
+		if not self.suppress_progress:
+				print(f"Cleaning up FireProx endpoints...")
+		fp_ids = list(self.fp_urls.values())
+		while fp_ids:
+			fp_id = fp_ids.pop().replace("https://","").split(".")[0]
+			try:
+				self.fp.delete_api(fp_id)
+			except:
+				time.sleep(1)
+				fp_ids.append(fp_id)
+		self.fp_done.set()
+
+
+	def prepare_fireprox_url(self,url):
+		base_url = "/".join(url.split("/")[0:3])
+		path = "/".join(url.split("/")[3:])
+		if path.endswith("/"):
+			path = path[:-1] + "%2F"
+		if not self.fp_urls.get(base_url):
+			self.fp_requests.append(base_url)
+		while not self.fp_urls.get(base_url):
+			time.sleep(1)
+		fp_url = self.fp_urls.get(base_url)
+		fp_id = fp_url.replace("https://","").split(".")[0]
+		url = f"{fp_url}{path}"
+		return url, fp_id
+
+
+	def precheck_url(self,url):
+		if "mailto" in url:
+			return
+		if any(url.endswith(extension) for extension in self.media_files_ignore):
+			return
+		if any(social in url for social in self.socials) and not any(ignore in url for ignore in self.socials_ignore):
+			if url.count("/") < 3:
+				return
+			self.social_links.append(url)
+			return
+		if any(url.endswith(extension) for extension in self.file_extensions):
+			self.files.append(url)
+			return
+		return True
+
+
+	def postcheck_url(self,url):
+		url_domain = url.replace("https://","").replace("http://","").split("/")[0]
+		if url_domain.endswith(self.base_domain):
+			if url_domain is not self.base_domain and url_domain not in self.sub_domains:
+				self.sub_domains.append(url_domain)
+			if url not in self.processed and url not in self.queue.queue:
+				return True
+		return
+
+
+	def url_from_link(self, link, current_url):
+		base_url = "/".join(current_url.split("/")[0:3])
+		protocol = base_url.split("/")[0]
+		if "@" in link:
+			return
+		if link.startswith("../"):
+			count = link.count("../")
+			link = f'{"/".join(current_url.split("/")[:-1*count])}/{link.replace("../","")}'
+		if link.startswith("//"):
+			link = link.replace("//","")
+		elif link.startswith("/"):
+			link = f"{base_url}{link}"
+		if "//" in link and not link.startswith("http"):
+			return
+		if ":" in link and not link.startswith("http"):
+			return
+		if "http://" not in link and "https://" not in link:
+			if "." not in link.split("/")[0]:
+				link = f"{base_url}/{link}"
+			else:
+				link = f"{protocol}//{link}"
+		return link
+
+
+	def precheck_response(self, response):
+		if response.status_code == 429:
+			if not self.alerts:
+				self.alerts.append("Server responded with 429 'Too Many Requests'. Wait a bit and back off threads.")
+			return
+		elif response.status_code == 403:
+			if response.headers.get("CF-RAY") and any(cf_string in response.text for cf_string in self.cf_strings):
+				if not self.alerts:
+					self.alerts.append("Cloudflare challenge detected.")
+				return
+		return True
+
+
+	def crawler(self):
+		while True:
+			url = self.queue.get()
+			if url is None:
+				self.queue.task_done()
+				continue
+			if self.alerts:
+				self.queue.task_done()
+				continue
+			if self.limit != 0 and len(self.processed) > self.limit:
+				self.alerts.append("Stopped when the link processing limit was reached")
+				self.queue.task_done()
+				continue
+			try:
+				if not self.suppress_progress:
+					print("Crawling {}".format(url.replace("%2F","/")))
+				
+				self.processed.append(url)
+				original_url = url
+				original_base_url = "/".join(original_url.split("/")[0:3])
+				original_protocol = original_base_url.split("/")[0]
+				if self.fireprox:
+					url, fp_id = self.prepare_fireprox_url(url)
+					
+				response = requests.get(url, headers=self.headers, proxies=self.proxy, verify=False, stream=True, timeout=10, allow_redirects=False)
+				if not self.precheck_response(response):
+					self.queue.task_done()
+					response.close()
+					continue
+				if response.is_redirect:
+					next_url = response.next.url
+					if self.fireprox and fp_id in next_url:
+						next_path = "/".join(next_url.split("/")[3:]).replace("fireprox/","")
+						next_url = f"{original_base_url}/{next_path}"
+					if self.postcheck_url(next_url):
+						self.queue.put(next_url)
+					self.queue.task_done()
+					response.close()
+					continue
+				current_url = response.url
+				if self.fireprox and fp_id in current_url:
+					current_url = original_url
+				
+				if response.headers.get("Content-Security-Policy") and "frame-ancestors" in response.headers.get("Content-Security-Policy").lower():
+					self.interesting.append(response.headers.get("Content-Security-Policy"))
+				if response.headers.get("content-type") and "text/html" not in response.headers.get("content-type"):
+					if any(response.url.endswith(extension) for extension in self.file_extensions):
+						self.files.append(current_url)
+					elif any(response.headers.get("content-type") == content_type for content_type in self.file_content_types):
+						self.files.append(current_url)
+					elif any(response.headers.get("content-type") == content_type for content_type in self.interesting_content_types):
+						self.interesting.append(current_url)
+					self.queue.task_done()
+					response.close()
+					continue
+				
+				if current_url != original_url and current_url in self.processed:
+					self.queue.task_done()
+					response.close()
+					continue			
+
+				if not self.precheck_url(current_url):
+					self.queue.task_done()
+					response.close()
+					continue
+				
+				response_text = response.text
+				response.close()
+				soup = BeautifulSoup(response_text,"lxml")
+				for email_domain in self.email_domains:
+					self.emails.extend([email.lower() for email in re.findall(fr"((?<!\\)[A-Za-z0-9+.]+@[\w]*{email_domain})", response_text)])
+				hrefs = list(set([a["href"] for a in soup.findAll("a",href=True)]))
+				if not hrefs:
+					if "Incapsula incident ID" in response_text:
+						if not self.alerts:
+							self.alerts.append(f"Incapsula challenge detected.")
+					self.queue.task_done()
+					continue
+
+				for href in hrefs:
+					href = self.url_from_link(href,current_url)
+					if href and self.precheck_url(href):
+						href = href.split("#")[0].split("?")[0].lower().strip()
+						if href and self.postcheck_url(href):
+							self.queue.put(href)
+						
+			except requests.exceptions.TooManyRedirects:
+				pass
+			except requests.exceptions.Timeout:
+				pass
+			except requests.exceptions.ConnectionError:
+				pass
+			except Exception as ex:
+				self.alerts.append(f"Unhandled exception ({str(ex)})")
+
+			self.queue.task_done()
+
+
+	def process_robots(self,url):
+		original_url = url
+		original_base_url = "/".join(original_url.split("/")[0:3])
+		base_url = original_base_url
+		original_protocol = original_base_url.split("/")[0]
+		if not url.endswith("/"):
+			url = url + "/"
+		url = url + "robots.txt"
+		if self.fireprox:
+			url,fp_id = self.prepare_fireprox_url(url)
+		response = requests.get(url, headers=self.headers, proxies=self.proxy, verify=False, stream=True, timeout=10, allow_redirects=False)
+		if not self.precheck_response(response):
+			return
+		redirect_count = 0
+		while response.is_redirect:
+			response.close()
+			redirect_count += 1
+			if redirect_count > 5:
+				return False
+			url = response.next.url
+			base_url = "/".join(url.split("/")[0:3])
+			if self.fireprox:
+				url,fp_id = self.prepare_fireprox_url(url)
+			response = requests.get(url, headers=self.headers, proxies=self.proxy, verify=False, stream=True, timeout=10, allow_redirects=False)
+			if not self.precheck_response(response):
+				response.close()
+				return
+		
+		robots_urls = []
+		self.sitemaps = []
+		for line in response.text.splitlines():
+			if self.robots:
+				if "allow:" in line.lower():
+					resource = line.replace("Disallow:","").replace("Allow:","").replace("*","").strip()
+					if resource != "/?":
+						if resource and resource != "/?":
+							url = f"{base_url}{resource}"
+							if url not in robots_urls and self.postcheck_url(url):
+								self.queue.put(url)
+								robots_urls.append(url)
+			if self.sitemap and "Sitemap:" in line:
+					self.sitemaps.append(line.replace("Sitemap:","").strip())
+		response.close()
+		if self.sitemap:
+			if not self.sitemaps:
+				self.sitemaps.append(f"{base_url}/sitemap.xml")
+
+
+	def process_sitemap(self,url):
+		original_url = url
+		original_base_url = "/".join(original_url.split("/")[0:3])
+		base_url = original_base_url
+		original_protocol = original_base_url.split("/")[0]
+		if self.fireprox:
+			url,fp_id = self.prepare_fireprox_url(url)
+		response = requests.get(url, headers=self.headers, proxies=self.proxy, verify=False, stream=True, timeout=10, allow_redirects=False)
+		if not self.precheck_response(response):
+			response.close()
+			return
+		redirect_count = 0
+		while response.is_redirect:
+			response.close()
+			redirect_count += 1
+			if redirect_count > 5:
+				return False
+			url = response.next.url
+			base_url = "/".join(url.split("/")[0:3])
+			if self.fireprox:
+				url,fp_id = self.prepare_fireprox_url(url)
+			response = requests.get(url, headers=self.headers, proxies=self.proxy, verify=False, stream=True, timeout=10, allow_redirects=False)
+			if not self.precheck_response(response):
+				response.close()
+				return
+		soup = BeautifulSoup(response.text,"xml")
+		response.close()
+		if soup.find("sitemapindex"):
+			for url in soup.find_all("loc"):
+				self.sitemaps.append(url.text)
+		else:
+			for url in soup.find_all("loc"):
+				if self.postcheck_url(url.text):
+					self.queue.put(url.text)
+
+
+	def watcher(self):
+		self.queue.join()
+		self.done.set()
+
+
+	def crawl(self):
+		if self.robots or self.sitemap:
+			if not self.suppress_progress:
+				if self.robots:
+					print("Processing robots.txt...")
+				else:
+					print("Processing sitemap...")
+			self.process_robots(self.url)
+
+			if self.sitemap:
+				if not self.suppress_progress:
+					if self.robots:
+						print("Processing sitemap...")
+				for url in self.sitemaps:
+					self.process_sitemap(url)
+
+		if not self.suppress_progress:
+			print("Preparing to crawl...")
+		self.queue.put(self.url)
+		crawlers = [threading.Thread(target=self.crawler,args=(),daemon=True) for _ in range(self.threads)]
+		[crawler.start() for crawler in crawlers]
+		threading.Thread(target=self.watcher,args=(),daemon=True).start()
+		
+		try:
+			self.done.wait()
+		except KeyboardInterrupt:
+			if not self.suppress_progress:
+				print("\nTerminating...")
+			self.alerts.append("Terminated early due to keyboard interrupt")
+		if self.fireprox:
+			self.fp_done.wait()
+
+		return {
+			"urls":list(set(self.processed)),
+			"sub_domains":list(set(self.sub_domains)),
+			"social_links":list(set(self.social_links)),
+			"emails":list(set(self.emails)),
+			"files":list(set(self.files)),
+			"interesting":list(set(self.interesting)),
+			"alerts":list(set(self.alerts))
+		}
+
+
+if __name__ == "__main__":
+	import argparse
+
+	parser = argparse.ArgumentParser(description = "Crawl a site and extract useful recon info.")
+	parser.add_argument(
+		"--url",
+		required=True,
+		help="An initial URL to target."
+	)
+	parser.add_argument(
+		"--email",
+		required=False,
+		help="A comma-separated list of email domains to look for in page content. Defaults to the root domain of the passed-in URL."
+	)
+	parser.add_argument(
+		"--threads",
+		required=False,
+		help="The max number of threads to use. Defaults to 10.",
+		default=10,
+		type=int
+	)
+	parser.add_argument(
+		"--limit",
+		required=False,
+		help="The number of URLs to process before exiting. Defaults to 500. Set to 0 for no limit (careful).",
+		default=500,
+		type=int
+	)
+	parser.add_argument(
+		"--proxy",
+		required=False,
+		help="Specify a proxy to use."
+	)
+	parser.add_argument(
+		"--headers",
+		required=False,
+		help="Override defaults with the indicated headers. ex: \"{'user-agent':'value','accept':'value'}\""
+	)
+	parser.add_argument(
+		"--fireprox",
+		required=False,
+		help="Automatically configure FireProx endpoints as needed. Pass in credentials or use the ~/.aws/credentials file.",
+		action="store_true"
+	)
+	parser.add_argument(
+		"--region",
+		required=False,
+		help="The AWS region to create FireProx resources in."
+	)
+	parser.add_argument(
+		"--access_key",
+		required=False,
+		help="The access key used to create FireProx resources in AWS."
+	)
+	parser.add_argument(
+		"--secret_access_key",
+		required=False,
+		help="The secret access key used to create FireProx resources in AWS."
+	)
+	parser.add_argument(
+		"--json",
+		required=False,
+		help="Output in JSON format",
+		action="store_true"
+	)
+	parser.add_argument(
+		"--robots",
+		required=False,
+		help="Search pages found in the robots.txt file",
+		action="store_true"
+	)
+	parser.add_argument(
+		"--sitemap",
+		required=False,
+		help="Search pages found in the site's sitemap",
+		action="store_true"
+	)
+	parser.add_argument(
+		"--suppress_progress",
+		required=False,
+		help="Only show final output",
+		action="store_true"
+	)
+	args = parser.parse_args()
+	if (args.access_key and not args.secret_access_key) or (args.secret_access_key and not args.access_key):
+		sys.exit("When providing keys, provide both an access key and a secret access key.")
+
+	creepycrawler = CreepyCrawler(**vars(args))
+	results = creepycrawler.crawl()
+	if args.json:
+		print(json.dumps(results))
+	else:
+		if results.get("sub_domains"):
+			print(f"\nSubdomains ({len(results.get('sub_domains'))}):")
+			for sub_domain in results.get("sub_domains"):
+				print(f"\t{sub_domain}")
+		if results.get("social_links"):
+			socials = dict(zip([link.lower() for link in results.get("social_links")], results.get("social_links"))).values()
+			print(f"\nSocial Links ({len(results.get('social_links'))}):")
+			for social_link in sorted(list(set(socials))):
+				print(f"\t{social_link}")
+		if results.get("emails"):
+			print(f"\nEmails ({len(results.get('emails'))}):")
+			for email in results.get("emails"):
+				print(f"\t{email}")
+		if results.get("files"):
+			print(f"\nFiles ({len(results.get('files'))}):")
+			for file in sorted(results.get("files")):
+				print(f"\t{file}")
+		if results.get("interesting"):
+			print(f"\nInteresting ({len(results.get('interesting'))}):")
+			for item in results.get("interesting"):
+				print(f"\t{item}")
+		for alert in results.get("alerts"):
+			print(f"\nALERT:\t{alert}")
+
+		print(f"\nFinished processing {len(creepycrawler.processed)} URLs")
