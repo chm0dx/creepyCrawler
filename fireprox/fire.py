@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+#From https://github.com/chm0dx/fireprox, forked from https://github.com/ustayready/fireprox
+
 from multiprocessing import Pool
 from pathlib import Path
 import shutil
