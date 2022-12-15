@@ -77,7 +77,7 @@ class CreepyCrawler():
 			try:
 				self.fp.delete_api(fp_id)
 			except:
-				time.sleep(1)
+				time.sleep(.5)
 				fp_ids.append(fp_id)
 		self.fp_done.set()
 
@@ -477,8 +477,11 @@ if __name__ == "__main__":
 	if (args.access_key and not args.secret_access_key) or (args.secret_access_key and not args.access_key):
 		sys.exit("When providing keys, provide both an access key and a secret access key.")
 
-	creepycrawler = CreepyCrawler(**vars(args))
-	results = creepycrawler.crawl()
+	try:
+		creepycrawler = CreepyCrawler(**vars(args))
+		results = creepycrawler.crawl()
+	except Exception as ex:
+		sys.exit(ex)
 	if args.json:
 		print(json.dumps(results))
 	else:

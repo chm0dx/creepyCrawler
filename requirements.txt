@@ -1,0 +1,6 @@
+requests
+boto3
+tldextract
+tzlocal
+bs4
+lxml
