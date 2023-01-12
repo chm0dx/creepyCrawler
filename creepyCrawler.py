@@ -2,6 +2,7 @@
 
 import ast
 import json
+import random
 import re
 import requests
 import sys
@@ -19,6 +20,10 @@ class CreepyCrawler():
 		urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 		self.suppress_progress = True
 		self.files = []
+		self.comments = False
+		self.tags = False
+		self.tags_list = []
+		self.comments_list = []
 		self.emails = []
 		self.social_links = []
 		self.sub_domains = []
@@ -26,12 +31,13 @@ class CreepyCrawler():
 		self.processed = []
 		self.alerts = []
 		self.socials = ["youtube.com","facebook.com","instagram.com","linkedin.com","twitter.com","github.com"]
-		self.socials_ignore = ["help.github.com","linkedin.com/redir","facebook.com/dialog","linkedin.com/feed/hashtag","linkedin.com/cws","twitter.com/hashtag","facebook.com/sharer","twitter.com/intent","twitter.com/home?status=","facebook.com/sharer.php","facebook.com/share.php","linkedin.com/shareArticle","youtube.com/ads","youtube.com/about","youtube.com/creators","youtube.com/howyoutubeworks","google.com/youtube","twitter.com/share","twitter.com/privacy","linkedin.com/static","linkedin.com/learning","help.instagram.com","facebook.com/policy.php","facebook.com/help","facebook.com/about","facebook.com/ads","developers.facebook.com"]
+		self.socials_ignore = ["linkedin.com/sharing/share-offsite/","help.github.com","linkedin.com/redir","facebook.com/dialog","linkedin.com/feed/hashtag","linkedin.com/cws","twitter.com/hashtag","facebook.com/sharer","twitter.com/intent","twitter.com/home?status=","facebook.com/sharer.php","facebook.com/share.php","linkedin.com/shareArticle","youtube.com/ads","youtube.com/about","youtube.com/creators","youtube.com/howyoutubeworks","google.com/youtube","twitter.com/share","twitter.com/privacy","linkedin.com/static","linkedin.com/learning","help.instagram.com","facebook.com/policy.php","facebook.com/help","facebook.com/about","facebook.com/ads","developers.facebook.com"]
 		self.file_extensions = [".pdf",".docx",".doc",".xlsx",".xls",".pptx",".ppt",".exe",".zip",".7z",".7zip","pkg","deb"]
 		self.media_files_ignore = [".png",".gif",".jpg"]
 		self.file_content_types = ["application/pdf"]
 		self.interesting_content_types = ["application/json"]
 		self.cf_strings = ["Checking if the site connection is secure","Attention Required!", "Just a moment..."]
+		self.tag_filters = [r"\b(UA-[\d-]{3,})", r"\b(AW-[\d-]{3,})", r"\b(G-(?=.{6,})(?:\d+[a-zA-Z]|[a-zA-Z]+\d)[a-zA-Z\d-]+)", r"\b(GTM-[\w]{3,})"]
 		self.fp_requests = []
 		self.fp_urls = {}
 		self.queue = Queue()
@@ -55,7 +61,8 @@ class CreepyCrawler():
 				access_key=self.access_key,
 				secret_access_key=self.secret_access_key
 			)
-			self.headers["X-My-X-Forwarded-For"] = "86.75.30.9"
+			random_url = '.'.join(str(random.randint(0,255)) for _ in range(4))
+			self.headers["X-My-X-Forwarded-For"] = random_url
 			self.fp_done = threading.Event()
 			threading.Thread(target=self.manage_fp,args=(),daemon=True).start()
 
@@ -229,8 +236,19 @@ class CreepyCrawler():
 				response_text = response.text
 				response.close()
 				soup = BeautifulSoup(response_text,"lxml")
+
 				for email_domain in self.email_domains:
 					self.emails.extend([email.lower() for email in re.findall(fr"((?<!\\)[A-Za-z0-9+.]+@[\w]*{email_domain})", response_text)])
+
+				if self.comments:
+					self.comments_list.extend([comment.strip().lower() for comment in re.findall(r'<!--(.*?)-->',response_text)])
+
+				if self.tags:
+					for filter in self.tag_filters:
+						self.tags_list.extend([tag.strip().lower() for tag in re.findall(filter,response_text)])
+						if "g-suite" in self.tags_list:
+							a = 1
+
 				hrefs = list(set([a["href"] for a in soup.findAll("a",href=True)]))
 				if not hrefs:
 					if "Incapsula incident ID" in response_text:
@@ -386,6 +404,8 @@ class CreepyCrawler():
 			"emails":list(set(self.emails)),
 			"files":list(set(self.files)),
 			"interesting":list(set(self.interesting)),
+			"comments":list(set(self.comments_list)),
+			"tags":list(set(self.tags_list)),
 			"alerts":list(set(self.alerts))
 		}
 
@@ -473,8 +493,20 @@ if __name__ == "__main__":
 		help="Only show final output",
 		action="store_true"
 	)
+	parser.add_argument(
+		"--comments",
+		required=False,
+		help="Return HTML comments extracted from crawled pages",
+		action="store_true"
+	)
+	parser.add_argument(
+		"--tags",
+		required=False,
+		help="Return tags (UA,GTM,etc.) extracted from crawled pages",
+		action="store_true"
+	)
 	args = parser.parse_args()
-	if (args.access_key and not args.secret_access_key) or (args.secret_access_key and not args.access_key):
+	if not args.access_key and args.secret_access_key:
 		sys.exit("When providing keys, provide both an access key and a secret access key.")
 
 	try:
@@ -505,6 +537,14 @@ if __name__ == "__main__":
 		if results.get("interesting"):
 			print(f"\nInteresting ({len(results.get('interesting'))}):")
 			for item in results.get("interesting"):
+				print(f"\t{item}")
+		if results.get("comments"):
+			print(f"\nComments ({len(results.get('comments'))}):")
+			for item in results.get("comments"):
+				print(f"\t{item}")
+		if results.get("tags"):
+			print(f"\nTags ({len(results.get('tags'))}):")
+			for item in results.get("tags"):
 				print(f"\t{item}")
 		for alert in results.get("alerts"):
 			print(f"\nALERT:\t{alert}")
