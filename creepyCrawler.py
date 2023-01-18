@@ -105,6 +105,7 @@ class CreepyCrawler():
 
 
 	def precheck_url(self,url):
+		url = url.split("?")[0].split("#")[0]
 		if "mailto" in url:
 			return
 		if any(url.endswith(extension) for extension in self.media_files_ignore):
