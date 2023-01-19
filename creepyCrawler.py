@@ -9,7 +9,7 @@ import sys
 import threading
 import time
 
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, Comment
 from fireprox import fire
 from queue import Queue
 from requests.packages import urllib3
@@ -242,7 +242,7 @@ class CreepyCrawler():
 					self.emails.extend([email.lower() for email in re.findall(fr"((?<!\\)[A-Za-z0-9+.]+@[\w]*{email_domain})", response_text)])
 
 				if self.comments:
-					self.comments_list.extend([comment.strip().lower() for comment in re.findall(r'<!--(.*?)-->',response_text)])
+					self.comments_list.extend([comment.strip() for comment in soup.findAll(text=lambda text:isinstance(text, Comment))])
 
 				if self.tags:
 					for filter in self.tag_filters:
