@@ -84,7 +84,7 @@ class CreepyCrawler():
 			try:
 				self.fp.delete_api(fp_id)
 			except:
-				time.sleep(.5)
+				time.sleep(.1)
 				fp_ids.append(fp_id)
 		self.fp_done.set()
 
@@ -156,6 +156,8 @@ class CreepyCrawler():
 
 
 	def precheck_response(self, response):
+		if response.status_code == 500:
+			return
 		if response.status_code == 429:
 			if not self.alerts:
 				self.alerts.append("Server responded with 429 'Too Many Requests'. Wait a bit and back off threads.")
