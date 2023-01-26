@@ -11,7 +11,7 @@ OSINT tool to crawl a site and extract useful recon info.
     * A list of crawled site links
     * HTML comments
     * Marketing tags (UA,GTM, etc.)
-    * 'Interesting' findings such as frame ancestors content and resource that return JSON content
+    * 'Interesting' findings such as frame ancestors content and resources that return JSON content
  * Built-in FireProx to automatically create endpoints for each subdomain, rotate source IP, and cleanup at the end
     * Forked and modified ([chm0dx/fireprox](https://github.com/chm0dx/fireprox)) from the awesome [ustayready/fireprox](https://github.com/ustayready/fireprox)
  * HTTP/SOCKS proxy support
