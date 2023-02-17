@@ -10,6 +10,7 @@ OSINT tool to crawl a site and extract useful recon info.
     * Files
     * A list of crawled site links
     * HTML comments
+    * IP addresses
     * Marketing tags (UA,GTM, etc.)
     * 'Interesting' findings such as frame ancestors content and resources that return JSON content
  * Built-in FireProx to automatically create endpoints for each subdomain, rotate source IP, and cleanup at the end
@@ -52,6 +53,7 @@ OSINT tool to crawl a site and extract useful recon info.
       --suppress_progress   Only show final output
       --comments            Return HTML comments extracted from crawled pages
       --tags                Return tags (UA,GTM,etc.) extracted from crawled pages
+      --ips                 Return IP addresses extracted from crawled page content
 
 
 ![I bet you can hear the song in your head...](https://media.giphy.com/media/Lz1LMB0rTWhNIKZdmD/giphy.gif)

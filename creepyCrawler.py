@@ -22,9 +22,11 @@ class CreepyCrawler():
 		self.files = []
 		self.comments = False
 		self.tags = False
+		self.ips = False
 		self.tags_list = []
 		self.comments_list = []
 		self.emails = []
+		self.ips_list = []
 		self.social_links = []
 		self.sub_domains = []
 		self.interesting = []
@@ -106,6 +108,8 @@ class CreepyCrawler():
 
 	def precheck_url(self,url):
 		base_url = url.split("?")[0].split("#")[0]
+		if url.endswith("email-protection"):
+			return
 		if "mailto" in url:
 			return
 		if any(base_url.endswith(extension) for extension in self.media_files_ignore):
@@ -240,6 +244,10 @@ class CreepyCrawler():
 				response.close()
 				soup = BeautifulSoup(response_text,"lxml")
 
+
+				if self.ips:
+					self.ips_list.extend(re.findall(r'[^0-9-a-zA-Z]((?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[0-9]{1,2})\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[0-9]{1,2})\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[0-9]{1,2})\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[0-9]{1,2}))[^0-9-a-zA-Z]',response.text))
+	
 				for email_domain in self.email_domains:
 					self.emails.extend([email.lower() for email in re.findall(fr"((?<!\\)[A-Za-z0-9+.]+@[\w]*{email_domain})", response_text)])
 
@@ -405,6 +413,7 @@ class CreepyCrawler():
 			"sub_domains":list(set(self.sub_domains)),
 			"social_links":list(set(self.social_links)),
 			"emails":list(set(self.emails)),
+			"ips":list(set(self.ips_list)),
 			"files":list(set(self.files)),
 			"interesting":list(set(self.interesting)),
 			"comments":list(set(self.comments_list)),
@@ -508,6 +517,12 @@ if __name__ == "__main__":
 		help="Return tags (UA,GTM,etc.) extracted from crawled pages",
 		action="store_true"
 	)
+	parser.add_argument(
+		"--ips",
+		required=False,
+		help="Return IP addresses extracted from crawled page content",
+		action="store_true"
+	)
 	args = parser.parse_args()
 	if not args.access_key and args.secret_access_key:
 		sys.exit("When providing keys, provide both an access key and a secret access key.")
@@ -537,6 +552,10 @@ if __name__ == "__main__":
 			print(f"\nFiles ({len(results.get('files'))}):")
 			for file in sorted(results.get("files")):
 				print(f"\t{file}")
+		if results.get("ips"):
+			print(f"\nIPs ({len(results.get('ips'))}):")
+			for ip in sorted(results.get("ips")):
+				print(f"\t{ip}")
 		if results.get("interesting"):
 			print(f"\nInteresting ({len(results.get('interesting'))}):")
 			for item in results.get("interesting"):
