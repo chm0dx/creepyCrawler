@@ -155,7 +155,8 @@ class CreepyCrawler():
 			if "." not in link.split("/")[0]:
 				link = f"{base_url}/{link}"
 			else:
-				link = f"{protocol}//{link}"
+				link = f"{base_url}/{link}"
+				#link = f"{protocol}//{link}"
 		return link
 
 
@@ -252,7 +253,7 @@ class CreepyCrawler():
 					self.emails.extend([email.lower() for email in re.findall(fr"((?<!\\)[A-Za-z0-9+.]+@[\w]*{email_domain})", response_text)])
 
 				if self.comments:
-					self.comments_list.extend([comment.strip() for comment in soup.findAll(text=lambda text:isinstance(text, Comment))])
+					self.comments_list.extend([comment.strip() for comment in soup.findAll(string=lambda text:isinstance(text, Comment))])
 
 				if self.tags:
 					for filter in self.tag_filters:
