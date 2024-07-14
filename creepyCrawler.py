@@ -26,6 +26,8 @@ class CreepyCrawler():
 		self.tags_list = []
 		self.comments_list = []
 		self.emails = []
+		self.phone_regex = r'\+?\d{1,4}?[-.\s]?\(?\d{1,3}?\)?[-.\s]?\d{1,4}[-.\s]?\d{1,4}[-.\s]?\d{1,9}'
+		self.phone_numbers = []
 		self.ips_list = []
 		self.social_links = []
 		self.sub_domains = []
@@ -174,6 +176,10 @@ class CreepyCrawler():
 				return
 		return True
 
+	def extract_phone_numbers(self, text):
+		soup = BeautifulSoup(text, 'html.parser')
+		body_content = soup.body.get_text(separator=' ', strip=True)
+		return re.findall(self.phone_regex, body_content)
 
 	def crawler(self):
 		while True:
@@ -248,7 +254,10 @@ class CreepyCrawler():
 
 				if self.ips:
 					self.ips_list.extend(re.findall(r'[^0-9-a-zA-Z]((?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[0-9]{1,2})\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[0-9]{1,2})\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[0-9]{1,2})\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[0-9]{1,2}))[^0-9-a-zA-Z]',response.text))
-	
+
+				if self.phone:
+					self.phone_numbers.extend(self.extract_phone_numbers(response_text))
+
 				for email_domain in self.email_domains:
 					self.emails.extend([email.lower() for email in re.findall(fr"((?<!\\)[A-Za-z0-9+.]+@[\w]*{email_domain})", response_text)])
 
@@ -414,6 +423,7 @@ class CreepyCrawler():
 			"sub_domains":list(set(self.sub_domains)),
 			"social_links":list(set(self.social_links)),
 			"emails":list(set(self.emails)),
+			"phone_numbers": list(set(self.phone_numbers)),
 			"ips":list(set(self.ips_list)),
 			"files":list(set(self.files)),
 			"interesting":list(set(self.interesting)),
@@ -524,6 +534,12 @@ if __name__ == "__main__":
 		help="Return IP addresses extracted from crawled page content",
 		action="store_true"
 	)
+	parser.add_argument(
+		"--phone",
+		required=False,
+		help="Return phone numbers extracted from crawled page content",
+		action="store_true"
+	)
 	args = parser.parse_args()
 	if not args.access_key and args.secret_access_key:
 		sys.exit("When providing keys, provide both an access key and a secret access key.")
@@ -549,6 +565,10 @@ if __name__ == "__main__":
 			print(f"\nEmails ({len(results.get('emails'))}):")
 			for email in results.get("emails"):
 				print(f"\t{email}")
+		if results.get("phone_numbers"):
+			print(f"\nPhone Numbers ({len(results.get('phone_numbers'))}):")
+			for phone in sorted(results.get("phone_numbers")):
+				print(f"\t{phone}")
 		if results.get("files"):
 			print(f"\nFiles ({len(results.get('files'))}):")
 			for file in sorted(results.get("files")):

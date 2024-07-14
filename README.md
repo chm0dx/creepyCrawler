@@ -5,6 +5,7 @@ OSINT tool to crawl a site and extract useful recon info.
  * Provide a starting URL and automatically gather URLs to crawl via hrefs, robots.txt, and sitemap 
  * Extract useful recon info:
     * Emails
+    * Phone numbers
     * Social media links
     * Subdomains
     * Files
@@ -29,7 +30,7 @@ OSINT tool to crawl a site and extract useful recon info.
 
     creepyCrawler.py --url URL [--email EMAIL] [--threads THREADS] [--limit LIMIT] [--proxy PROXY] [--headers HEADERS] [--fireprox]
                      [--region REGION] [--access_key ACCESS_KEY] [--secret_access_key SECRET_ACCESS_KEY] [--json] [--robots]
-                     [--sitemap] [--suppress_progress] [--comments] [--tags]
+                     [--sitemap] [--suppress_progress] [--comments] [--tags] [--ips] [--phone]
 
     Crawl a site and extract useful recon info.
 
@@ -54,6 +55,7 @@ OSINT tool to crawl a site and extract useful recon info.
       --comments            Return HTML comments extracted from crawled pages
       --tags                Return tags (UA,GTM,etc.) extracted from crawled pages
       --ips                 Return IP addresses extracted from crawled page content
+      --phone               Return phone numbers extracted from crawled page content
 
 
 ![I bet you can hear the song in your head...](https://media.giphy.com/media/Lz1LMB0rTWhNIKZdmD/giphy.gif)
