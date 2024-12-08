@@ -28,10 +28,12 @@ class CreepyCrawler():
 		self.emails = []
 		self.ips_list = []
 		self.social_links = []
+		self.cloud_storage_list = []
 		self.sub_domains = []
 		self.interesting = []
 		self.processed = []
 		self.alerts = []
+		self.cloud_storage_regexes = ["([A-z0-9-]*\.s3\.amazonaws\.com)", "[^\.](s3\.amazonaws\.com\/[A-z0-9-]*)\/", "([A-z0-9-]*\.blob\.core\.windows\.net\/[A-z0-9-]*)", "[^\.](storage\.googleapis\.com\/[A-z0-9-]*)\/", "([A-z0-9-]*\.storage\.googleapis\.com)"]
 		self.socials = ["youtube.com","facebook.com","instagram.com","linkedin.com","twitter.com","github.com"]
 		self.socials_ignore = ["facebook.com/terms.php","facebook.com/privacy/explanation","linkedin.com/sharing/share-offsite/","help.github.com","linkedin.com/redir","facebook.com/dialog","linkedin.com/feed/hashtag","linkedin.com/cws","twitter.com/hashtag","facebook.com/sharer","twitter.com/intent","twitter.com/home?status=","facebook.com/sharer.php","facebook.com/share.php","linkedin.com/shareArticle","youtube.com/ads","youtube.com/about","youtube.com/creators","youtube.com/howyoutubeworks","google.com/youtube","twitter.com/share","twitter.com/privacy","linkedin.com/static","linkedin.com/learning","help.instagram.com","facebook.com/policy.php","facebook.com/help","facebook.com/about","facebook.com/ads","developers.facebook.com"]
 		self.file_extensions = [".pdf",".docx",".doc",".xlsx",".xls",".pptx",".ppt",".exe",".zip",".7z",".7zip","pkg","deb"]
@@ -245,6 +247,9 @@ class CreepyCrawler():
 				response.close()
 				soup = BeautifulSoup(response_text,"lxml")
 
+				for cloud_storage_regex in self.cloud_storage_regexes:
+					self.cloud_storage_list.extend(re.findall(rf'{cloud_storage_regex}',response_text))
+
 
 				if self.ips:
 					self.ips_list.extend(re.findall(r'[^0-9-a-zA-Z]((?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[0-9]{1,2})\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[0-9]{1,2})\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[0-9]{1,2})\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[0-9]{1,2}))[^0-9-a-zA-Z]',response.text))
@@ -414,6 +419,7 @@ class CreepyCrawler():
 			"sub_domains":list(set(self.sub_domains)),
 			"social_links":list(set(self.social_links)),
 			"emails":list(set(self.emails)),
+			"cloud_storages":list(set(self.cloud_storage_list)),
 			"ips":list(set(self.ips_list)),
 			"files":list(set(self.files)),
 			"interesting":list(set(self.interesting)),
@@ -553,6 +559,10 @@ if __name__ == "__main__":
 			print(f"\nFiles ({len(results.get('files'))}):")
 			for file in sorted(results.get("files")):
 				print(f"\t{file}")
+		if results.get("cloud_storages"):
+			print(f"\nCloud Storage ({len(results.get('cloud_storages'))}):")
+			for cloud_storage in sorted(results.get("cloud_storages")):
+				print(f"\t{cloud_storage}")
 		if results.get("ips"):
 			print(f"\nIPs ({len(results.get('ips'))}):")
 			for ip in sorted(results.get("ips")):
