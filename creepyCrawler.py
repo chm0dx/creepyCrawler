@@ -31,6 +31,7 @@ class CreepyCrawler():
 		self.cloud_storage_list = []
 		self.sub_domains = []
 		self.interesting = []
+		self.json_endpoints = []
 		self.processed = []
 		self.alerts = []
 		self.cloud_storage_regexes = ["([A-z0-9-]*\.s3\.amazonaws\.com)", "[^\.](s3\.amazonaws\.com\/[A-z0-9-]*)\/", "([A-z0-9-]*\.blob\.core\.windows\.net\/[A-z0-9-]*)", "[^\.](storage\.googleapis\.com\/[A-z0-9-]*)\/", "([A-z0-9-]*\.storage\.googleapis\.com)"]
@@ -39,7 +40,7 @@ class CreepyCrawler():
 		self.file_extensions = [".pdf",".docx",".doc",".xlsx",".xls",".pptx",".ppt",".exe",".zip",".7z",".7zip","pkg","deb"]
 		self.media_files_ignore = [".png",".gif",".jpg"]
 		self.file_content_types = ["application/pdf"]
-		self.interesting_content_types = ["application/json"]
+		self.interesting_content_types = []
 		self.cf_strings = ["Checking if the site connection is secure","Attention Required!", "Just a moment..."]
 		self.tag_filters = [r"\b(UA-[\d-]{3,})", r"\b(AW-[\d-]{3,})", r"\b(G-(?=.{6,})(?:\d+[a-zA-Z]|[a-zA-Z]+\d)[a-zA-Z\d-]+)", r"\b(GTM-[\w]{3,})"]
 		self.fp_requests = []
@@ -229,6 +230,9 @@ class CreepyCrawler():
 						self.files.append(current_url)
 					elif any(response.headers.get("content-type") == content_type for content_type in self.interesting_content_types):
 						self.interesting.append(current_url)
+					elif response.headers.get("content-type") == "application/json":
+						self.json_endpoints.append(current_url)
+						
 					self.queue.task_done()
 					response.close()
 					continue
@@ -425,7 +429,8 @@ class CreepyCrawler():
 			"interesting":list(set(self.interesting)),
 			"comments":list(set(self.comments_list)),
 			"tags":list(set(self.tags_list)),
-			"alerts":list(set(self.alerts))
+			"alerts":list(set(self.alerts)),
+			"json_endpoints":list(set(self.json_endpoints))
 		}
 
 
@@ -567,6 +572,10 @@ if __name__ == "__main__":
 			print(f"\nIPs ({len(results.get('ips'))}):")
 			for ip in sorted(results.get("ips")):
 				print(f"\t{ip}")
+		if results.get("json_endpoints"):
+			print(f"\nJSON Endpoints ({len(results.get('json_endpoints'))}):")
+			for item in results.get("json_endpoints"):
+				print(f"\t{item}")
 		if results.get("interesting"):
 			print(f"\nInteresting ({len(results.get('interesting'))}):")
 			for item in results.get("interesting"):
