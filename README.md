@@ -7,6 +7,7 @@ OSINT tool to crawl a site and extract useful recon info.
     * Emails
     * Social media links
     * Subdomains
+    * Azure, AWS, and GCP cloud storage links
     * Files
     * A list of crawled site links
     * HTML comments
