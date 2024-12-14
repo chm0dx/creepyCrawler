@@ -4,3 +4,4 @@ tldextract
 tzlocal
 bs4
 lxml
+playwright

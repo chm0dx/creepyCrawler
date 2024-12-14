@@ -23,6 +23,7 @@ class CreepyCrawler():
 		self.comments = False
 		self.tags = False
 		self.ips = False
+		self.headless = False
 		self.tags_list = []
 		self.comments_list = []
 		self.emails = []
@@ -247,7 +248,18 @@ class CreepyCrawler():
 					response.close()
 					continue
 				
-				response_text = response.text
+				if self.headless:
+					from playwright.sync_api import sync_playwright
+
+					with sync_playwright() as p:
+						browser = p.chromium.launch(headless=True)
+						context = browser.new_context(extra_http_headers=self.headers)
+						page = context.new_page()
+						page.goto(url)
+						response_text = page.content()
+				else:
+					response_text = response.text
+					
 				response.close()
 				soup = BeautifulSoup(response_text,"lxml")
 
@@ -497,6 +509,12 @@ if __name__ == "__main__":
 		"--json",
 		required=False,
 		help="Output in JSON format",
+		action="store_true"
+	)
+	parser.add_argument(
+		"--headless",
+		required=False,
+		help="Run in headless mode. Requires Playwright and deps (or use docker).",
 		action="store_true"
 	)
 	parser.add_argument(

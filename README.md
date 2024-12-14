@@ -16,6 +16,7 @@ OSINT tool to crawl a site and extract useful recon info.
     * 'Interesting' findings such as frame ancestors content and resources that return JSON content
  * Built-in FireProx to automatically create endpoints for each subdomain, rotate source IP, and cleanup at the end
     * Forked and modified ([chm0dx/fireprox](https://github.com/chm0dx/fireprox)) from the awesome [ustayready/fireprox](https://github.com/ustayready/fireprox)
+ * Headless (Playwright) option for sites that serve content via js
  * HTTP/SOCKS proxy support
  
  ![alt text](./creepyCrawler_demo.gif "Quick Demo")
@@ -25,6 +26,10 @@ OSINT tool to crawl a site and extract useful recon info.
     git clone https://github.com/chm0dx/creepyCrawler.git
     cd creepyCrawler
     pip install -r requirements.txt
+
+## Docker
+    docker build -t creepycrawler .
+    docker run -it creepycrawler args
 
 ## Use
 
@@ -55,6 +60,7 @@ OSINT tool to crawl a site and extract useful recon info.
       --comments            Return HTML comments extracted from crawled pages
       --tags                Return tags (UA,GTM,etc.) extracted from crawled pages
       --ips                 Return IP addresses extracted from crawled page content
+      --headless            Run in headless mode. Requires Playwright and deps (or use docker).
 
 
 ![I bet you can hear the song in your head...](https://media.giphy.com/media/Lz1LMB0rTWhNIKZdmD/giphy.gif)
