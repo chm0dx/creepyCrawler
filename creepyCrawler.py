@@ -33,6 +33,7 @@ class CreepyCrawler():
 		self.sub_domains = []
 		self.interesting = []
 		self.json_endpoints = []
+		self.login_pages = []
 		self.processed = []
 		self.alerts = []
 		self.cloud_storage_regexes = ["([A-z0-9-]*\.s3\.amazonaws\.com)", "[^\.](s3\.amazonaws\.com\/[A-z0-9-]*)\/", "([A-z0-9-]*\.blob\.core\.windows\.net\/[A-z0-9-]*)", "[^\.](storage\.googleapis\.com\/[A-z0-9-]*)\/", "([A-z0-9-]*\.storage\.googleapis\.com)"]
@@ -265,9 +266,11 @@ class CreepyCrawler():
 				response.close()
 				soup = BeautifulSoup(response_text,"lxml")
 
+				if soup.select('[type="password"]'):
+					self.login_pages.append(current_url)
+
 				for cloud_storage_regex in self.cloud_storage_regexes:
 					self.cloud_storage_list.extend(re.findall(rf'{cloud_storage_regex}',response_text))
-
 
 				if self.ips:
 					self.ips_list.extend(re.findall(r'[^0-9-a-zA-Z]((?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[0-9]{1,2})\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[0-9]{1,2})\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[0-9]{1,2})\.(?:25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[0-9]{1,2}))[^0-9-a-zA-Z]',response.text))
@@ -444,7 +447,8 @@ class CreepyCrawler():
 			"comments":list(set(self.comments_list)),
 			"tags":list(set(self.tags_list)),
 			"alerts":list(set(self.alerts)),
-			"json_endpoints":list(set(self.json_endpoints))
+			"json_endpoints":list(set(self.json_endpoints)),
+			"login_pages":list(set(self.login_pages))
 		}
 
 
@@ -588,6 +592,10 @@ if __name__ == "__main__":
 			print(f"\nCloud Storage ({len(results.get('cloud_storages'))}):")
 			for cloud_storage in sorted(results.get("cloud_storages")):
 				print(f"\t{cloud_storage}")
+		if results.get("login_pages"):
+			print(f"\nLogin Pages ({len(results.get('login_pages'))}):")
+			for login_page in sorted(results.get("login_pages")):
+				print(f"\t{login_page}")
 		if results.get("ips"):
 			print(f"\nIPs ({len(results.get('ips'))}):")
 			for ip in sorted(results.get("ips")):
