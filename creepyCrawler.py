@@ -117,7 +117,7 @@ class CreepyCrawler():
 		if "mailto" in url:
 			return
 		if any(base_url.endswith(extension) for extension in self.media_files_ignore):
-			returnfra
+			return
 		if any(social in base_url for social in self.socials) and not any(ignore in base_url for ignore in self.socials_ignore):
 			if url.count("/") < 3:
 				return
