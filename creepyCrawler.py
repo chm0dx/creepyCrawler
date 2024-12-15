@@ -117,7 +117,7 @@ class CreepyCrawler():
 		if "mailto" in url:
 			return
 		if any(base_url.endswith(extension) for extension in self.media_files_ignore):
-			return
+			returnfra
 		if any(social in base_url for social in self.socials) and not any(ignore in base_url for ignore in self.socials_ignore):
 			if url.count("/") < 3:
 				return
@@ -224,6 +224,8 @@ class CreepyCrawler():
 				
 				if response.headers.get("Content-Security-Policy") and "frame-ancestors" in response.headers.get("Content-Security-Policy").lower():
 					self.interesting.append(response.headers.get("Content-Security-Policy"))
+					sub_matches = re.findall(rf'[A-z-]*\.{self.base_domain}',response.headers.get("Content-Security-Policy"))
+					self.sub_domains.extend(sub_matches)
 				if response.headers.get("content-type") and "text/html" not in response.headers.get("content-type"):
 					if any(response.url.endswith(extension) for extension in self.file_extensions):
 						self.files.append(current_url)
@@ -565,15 +567,15 @@ if __name__ == "__main__":
 	if args.json:
 		print(json.dumps(results))
 	else:
-		if results.get("sub_domains"):
-			print(f"\nSubdomains ({len(results.get('sub_domains'))}):")
-			for sub_domain in results.get("sub_domains"):
-				print(f"\t{sub_domain}")
 		if results.get("social_links"):
 			socials = dict(zip([link.lower() for link in results.get("social_links")], results.get("social_links"))).values()
 			print(f"\nSocial Links ({len(results.get('social_links'))}):")
 			for social_link in sorted(list(set(socials))):
 				print(f"\t{social_link}")
+		if results.get("sub_domains"):
+			print(f"\nSubdomains ({len(results.get('sub_domains'))}):")
+			for sub_domain in results.get("sub_domains"):
+				print(f"\t{sub_domain}")
 		if results.get("emails"):
 			print(f"\nEmails ({len(results.get('emails'))}):")
 			for email in results.get("emails"):
