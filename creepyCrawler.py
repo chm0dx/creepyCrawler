@@ -37,8 +37,8 @@ class CreepyCrawler():
 		self.processed = []
 		self.alerts = []
 		self.cloud_storage_regexes = ["([A-z0-9-]*\.s3\.amazonaws\.com)", "[^\.](s3\.amazonaws\.com\/[A-z0-9-]*)\/", "([A-z0-9-]*\.blob\.core\.windows\.net\/[A-z0-9-]*)", "[^\.](storage\.googleapis\.com\/[A-z0-9-]*)\/", "([A-z0-9-]*\.storage\.googleapis\.com)"]
-		self.socials = ["youtube.com","facebook.com","instagram.com","linkedin.com","twitter.com","github.com"]
-		self.socials_ignore = ["facebook.com/terms.php","facebook.com/privacy/explanation","linkedin.com/sharing/share-offsite/","help.github.com","linkedin.com/redir","facebook.com/dialog","linkedin.com/feed/hashtag","linkedin.com/cws","twitter.com/hashtag","facebook.com/sharer","twitter.com/intent","twitter.com/home?status=","facebook.com/sharer.php","facebook.com/share.php","linkedin.com/shareArticle","youtube.com/ads","youtube.com/about","youtube.com/creators","youtube.com/howyoutubeworks","google.com/youtube","twitter.com/share","twitter.com/privacy","linkedin.com/static","linkedin.com/learning","help.instagram.com","facebook.com/policy.php","facebook.com/help","facebook.com/about","facebook.com/ads","developers.facebook.com"]
+		self.socials = ["youtube.com","facebook.com","instagram.com","linkedin.com","twitter.com","x.com","github.com"]
+		self.socials_ignore = ["facebook.com/terms.php","facebook.com/privacy/explanation","linkedin.com/sharing/share-offsite/","help.github.com","linkedin.com/redir","facebook.com/dialog","linkedin.com/feed/hashtag","linkedin.com/cws","twitter.com/hashtag","x.com/hashtag","facebook.com/sharer","twitter.com/intent","twitter.com/home?status=","x.com/intent","x.com/home?status=","facebook.com/sharer.php","facebook.com/share.php","linkedin.com/shareArticle","youtube.com/ads","youtube.com/about","youtube.com/creators","youtube.com/howyoutubeworks","google.com/youtube","twitter.com/share","twitter.com/privacy","x.com/share","x.com/privacy","linkedin.com/static","linkedin.com/learning","help.instagram.com","facebook.com/policy.php","facebook.com/help","facebook.com/about","facebook.com/ads","developers.facebook.com"]
 		self.file_extensions = [".pdf",".docx",".doc",".xlsx",".xls",".pptx",".ppt",".exe",".zip",".7z",".7zip","pkg","deb"]
 		self.media_files_ignore = [".png",".gif",".jpg"]
 		self.file_content_types = ["application/pdf"]
@@ -119,7 +119,9 @@ class CreepyCrawler():
 			return
 		if any(base_url.endswith(extension) for extension in self.media_files_ignore):
 			return
-		if any(social in base_url for social in self.socials) and not any(ignore in base_url for ignore in self.socials_ignore):
+		if re.findall(f"[^A-z-]({'|'.join(self.socials)})\/",base_url) and not any(ignore in base_url for ignore in self.socials_ignore):
+
+		#if any(social in base_url for social in self.socials) and not any(ignore in base_url for ignore in self.socials_ignore):
 			if url.count("/") < 3:
 				return
 			self.social_links.append(url)
