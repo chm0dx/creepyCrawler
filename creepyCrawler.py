@@ -36,7 +36,7 @@ class CreepyCrawler():
 		self.login_pages = []
 		self.processed = []
 		self.alerts = []
-		self.cloud_storage_regexes = ["([A-z0-9-]*\.s3\.amazonaws\.com)", "[^\.](s3\.amazonaws\.com\/[A-z0-9-]*)\/", "([A-z0-9-]*\.blob\.core\.windows\.net\/[A-z0-9-]*)", "[^\.](storage\.googleapis\.com\/[A-z0-9-]*)\/", "([A-z0-9-]*\.storage\.googleapis\.com)"]
+		self.cloud_storage_regexes = [r"([A-z0-9-]*\.s3\.amazonaws\.com)", r"[^\.](s3\.amazonaws\.com\/[A-z0-9-]*)\/", r"([A-z0-9-]*\.blob\.core\.windows\.net\/[A-z0-9-]*)", r"[^\.](storage\.googleapis\.com\/[A-z0-9-]*)\/", r"([A-z0-9-]*\.storage\.googleapis\.com)"]
 		self.socials = ["youtube.com","facebook.com","instagram.com","linkedin.com","twitter.com","x.com","github.com"]
 		self.socials_ignore = ["facebook.com/terms.php","facebook.com/privacy/explanation","linkedin.com/sharing/share-offsite/","help.github.com","linkedin.com/redir","facebook.com/dialog","linkedin.com/feed/hashtag","linkedin.com/cws","twitter.com/hashtag","x.com/hashtag","facebook.com/sharer","twitter.com/intent","twitter.com/home?status=","x.com/intent","x.com/home?status=","facebook.com/sharer.php","facebook.com/share.php","linkedin.com/shareArticle","youtube.com/ads","youtube.com/about","youtube.com/creators","youtube.com/howyoutubeworks","google.com/youtube","twitter.com/share","twitter.com/privacy","x.com/share","x.com/privacy","linkedin.com/static","linkedin.com/learning","help.instagram.com","facebook.com/policy.php","facebook.com/help","facebook.com/about","facebook.com/ads","developers.facebook.com"]
 		self.file_extensions = [".pdf",".docx",".doc",".xlsx",".xls",".pptx",".ppt",".exe",".zip",".7z",".7zip","pkg","deb"]
@@ -55,9 +55,13 @@ class CreepyCrawler():
 		self.email_domains = self.email_domains.split(",")
 
 		if self.headers:
-			self.headers = ast.literal_eval(self.custom_headers)
+			self.headers = ast.literal_eval(self.headers)
 		else:
 			self.headers = {'user-agent':'Screaming Frog SEO Spider/6.2'}
+		if self.cookies:
+			self.cookies = ast.literal_eval(self.cookies)
+		else:
+			self.cookies = {}
 		if self.proxy:
 			self.proxy = {"http":self.proxy,"https":self.proxy}
 		if "https://" not in self.url and "http://" not in self.url:
@@ -119,7 +123,7 @@ class CreepyCrawler():
 			return
 		if any(base_url.endswith(extension) for extension in self.media_files_ignore):
 			return
-		if re.findall(f"[^A-z-]({'|'.join(self.socials)})\/",base_url) and not any(ignore in base_url for ignore in self.socials_ignore):
+		if re.findall(fr"[^A-z-]({'|'.join(self.socials)})\/",base_url) and not any(ignore in base_url for ignore in self.socials_ignore):
 
 		#if any(social in base_url for social in self.socials) and not any(ignore in base_url for ignore in self.socials_ignore):
 			if url.count("/") < 3:
@@ -206,7 +210,7 @@ class CreepyCrawler():
 				if self.fireprox:
 					url, fp_id = self.prepare_fireprox_url(url)
 					
-				response = requests.get(url, headers=self.headers, proxies=self.proxy, verify=False, stream=True, timeout=10, allow_redirects=False)
+				response = requests.get(url, headers=self.headers, cookies=self.cookies, proxies=self.proxy, verify=False, stream=True, timeout=10, allow_redirects=False)
 				if not self.precheck_response(response):
 					self.queue.task_done()
 					response.close()
@@ -259,6 +263,10 @@ class CreepyCrawler():
 					with sync_playwright() as p:
 						browser = p.chromium.launch(headless=True)
 						context = browser.new_context(extra_http_headers=self.headers)
+						if self.cookies:
+							domain = re.findall(r'([a-zA-Z0-9\-]*\.[a-zA-Z0-9]*)',url)[0]
+							headless_cookies = [{"name":name,"value":value,"path":"/", "domain":domain} for name,value in self.cookies.items()]
+							context.add_cookies(headless_cookies)
 						page = context.new_page()
 						page.goto(url)
 						response_text = page.content()
@@ -281,7 +289,7 @@ class CreepyCrawler():
 					self.emails.extend([email.lower() for email in re.findall(fr"((?<!\\)[A-Za-z0-9+.]+@[\w]*{email_domain})", response_text)])
 
 				if self.comments:
-					self.comments_list.extend([comment.strip() for comment in soup.findAll(string=lambda text:isinstance(text, Comment))])
+					self.comments_list.extend([comment.strip() for comment in soup.find_all(string=lambda text:isinstance(text, Comment))])
 
 				if self.tags:
 					for filter in self.tag_filters:
@@ -289,7 +297,7 @@ class CreepyCrawler():
 						if "g-suite" in self.tags_list:
 							a = 1
 
-				hrefs = list(set([a["href"] for a in soup.findAll("a",href=True)]))
+				hrefs = list(set([a["href"] for a in soup.find_all("a",href=True)]))
 				if not hrefs:
 					if "Incapsula incident ID" in response_text:
 						if not self.alerts:
@@ -491,6 +499,11 @@ if __name__ == "__main__":
 		"--headers",
 		required=False,
 		help="Override defaults with the indicated headers. ex: \"{'user-agent':'value','accept':'value'}\""
+	)
+	parser.add_argument(
+		"--cookies",
+		required=False,
+		help="Provide cookies to use in requests. Useful for auth. ex: \"{'Authorization':'value','blah':'value'}\""
 	)
 	parser.add_argument(
 		"--fireprox",

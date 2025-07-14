@@ -48,6 +48,7 @@ OSINT tool to crawl a site and extract useful recon info.
       --limit LIMIT         The number of URLs to process before exiting. Defaults to 500. Set to 0 for no limit (careful).
       --proxy PROXY         Specify a proxy to use.
       --headers HEADERS     Override defaults with the indicated headers. ex: "{'user-agent':'value','accept':'value'}"
+      --cookies COOKIES     Provide cookies to use in requests. Useful for auth. ex: "{'Authorization':'value','blah':'value'}"
       --fireprox            Automatically configure FireProx endpoints. Pass in credentials or use the ~/.aws/credentials file.
       --region REGION       The AWS region to create FireProx resources in.
       --access_key ACCESS_KEY
