@@ -10,7 +10,7 @@ import threading
 import time
 
 from bs4 import BeautifulSoup, Comment
-from fireprox import fire
+from .fireprox import fire
 from queue import Queue
 from requests.packages import urllib3
 
@@ -18,7 +18,18 @@ from requests.packages import urllib3
 class CreepyCrawler():
 	def __init__(self,**kwargs):
 		urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+		self.email = kwargs.get('email', None)
+		self.headers = kwargs.get('headers', None)
+		self.cookies = kwargs.get('cookies', None)
+		self.proxy = kwargs.get('proxy', None)
+		self.fireprox = kwargs.get('fireprox', None)
+		self.robots = kwargs.get('robots', None)
+		self.sitemap = kwargs.get('sitemap', None)
+		self.threads = kwargs.get('threads', 10)
+		self.limit = kwargs.get('limit', 500)
+
 		self.suppress_progress = True
+
 		self.files = []
 		self.comments = False
 		self.tags = False
@@ -36,6 +47,7 @@ class CreepyCrawler():
 		self.login_pages = []
 		self.processed = []
 		self.alerts = []
+
 		self.cloud_storage_regexes = [r"([A-z0-9-]*\.s3\.amazonaws\.com)", r"[^\.](s3\.amazonaws\.com\/[A-z0-9-]*)\/", r"([A-z0-9-]*\.blob\.core\.windows\.net\/[A-z0-9-]*)", r"[^\.](storage\.googleapis\.com\/[A-z0-9-]*)\/", r"([A-z0-9-]*\.storage\.googleapis\.com)"]
 		self.socials = ["youtube.com","facebook.com","instagram.com","linkedin.com","twitter.com","x.com","github.com"]
 		self.socials_ignore = ["facebook.com/terms.php","facebook.com/privacy/explanation","linkedin.com/sharing/share-offsite/","help.github.com","linkedin.com/redir","facebook.com/dialog","linkedin.com/feed/hashtag","linkedin.com/cws","twitter.com/hashtag","x.com/hashtag","facebook.com/sharer","twitter.com/intent","twitter.com/home?status=","x.com/intent","x.com/home?status=","facebook.com/sharer.php","facebook.com/share.php","linkedin.com/shareArticle","youtube.com/ads","youtube.com/about","youtube.com/creators","youtube.com/howyoutubeworks","google.com/youtube","twitter.com/share","twitter.com/privacy","x.com/share","x.com/privacy","linkedin.com/static","linkedin.com/learning","help.instagram.com","facebook.com/policy.php","facebook.com/help","facebook.com/about","facebook.com/ads","developers.facebook.com"]
