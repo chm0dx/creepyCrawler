@@ -10,7 +10,11 @@ import threading
 import time
 
 from bs4 import BeautifulSoup, Comment
-from .fireprox import fire
+try:
+    from .fireprox import fire
+except ImportError:
+    from fireprox import fire
+
 from queue import Queue
 from requests.packages import urllib3
 
@@ -47,10 +51,11 @@ class CreepyCrawler():
 		self.login_pages = []
 		self.processed = []
 		self.alerts = []
+		self.js_list = []
 
 		self.cloud_storage_regexes = [r"([A-z0-9-]*\.s3\.amazonaws\.com)", r"[^\.](s3\.amazonaws\.com\/[A-z0-9-]*)\/", r"([A-z0-9-]*\.blob\.core\.windows\.net\/[A-z0-9-]*)", r"[^\.](storage\.googleapis\.com\/[A-z0-9-]*)\/", r"([A-z0-9-]*\.storage\.googleapis\.com)"]
 		self.socials = ["youtube.com","facebook.com","instagram.com","linkedin.com","twitter.com","x.com","github.com"]
-		self.socials_ignore = ["facebook.com/terms.php","facebook.com/privacy/explanation","linkedin.com/sharing/share-offsite/","help.github.com","linkedin.com/redir","facebook.com/dialog","linkedin.com/feed/hashtag","linkedin.com/cws","twitter.com/hashtag","x.com/hashtag","facebook.com/sharer","twitter.com/intent","twitter.com/home?status=","x.com/intent","x.com/home?status=","facebook.com/sharer.php","facebook.com/share.php","linkedin.com/shareArticle","youtube.com/ads","youtube.com/about","youtube.com/creators","youtube.com/howyoutubeworks","google.com/youtube","twitter.com/share","twitter.com/privacy","x.com/share","x.com/privacy","linkedin.com/static","linkedin.com/learning","help.instagram.com","facebook.com/policy.php","facebook.com/help","facebook.com/about","facebook.com/ads","developers.facebook.com"]
+		self.socials_ignore = ["linkedin.com/feed","facebook.com/terms.php","facebook.com/privacy/explanation","linkedin.com/sharing/share-offsite/","help.github.com","linkedin.com/redir","facebook.com/dialog","linkedin.com/feed/hashtag","linkedin.com/cws","twitter.com/hashtag","x.com/hashtag","facebook.com/sharer","twitter.com/intent","twitter.com/home?status=","x.com/intent","x.com/home?status=","facebook.com/sharer.php","facebook.com/share.php","linkedin.com/shareArticle","youtube.com/ads","youtube.com/about","youtube.com/creators","youtube.com/howyoutubeworks","google.com/youtube","twitter.com/share","twitter.com/privacy","x.com/share","x.com/privacy","linkedin.com/static","linkedin.com/learning","help.instagram.com","facebook.com/policy.php","facebook.com/help","facebook.com/about","facebook.com/ads","developers.facebook.com"]
 		self.file_extensions = [".pdf",".docx",".doc",".xlsx",".xls",".pptx",".ppt",".exe",".zip",".7z",".7zip","pkg","deb"]
 		self.media_files_ignore = [".png",".gif",".jpg"]
 		self.file_content_types = ["application/pdf"]
@@ -140,10 +145,10 @@ class CreepyCrawler():
 		#if any(social in base_url for social in self.socials) and not any(ignore in base_url for ignore in self.socials_ignore):
 			if url.count("/") < 3:
 				return
-			self.social_links.append(url)
+			self.social_links.append(url.split("#")[0])
 			return
 		if any(base_url.endswith(extension) for extension in self.file_extensions):
-			self.files.append(url)
+			self.files.append(url.split("#")[0])
 			return
 		return True
 
@@ -243,13 +248,15 @@ class CreepyCrawler():
 				
 				if response.headers.get("Content-Security-Policy") and "frame-ancestors" in response.headers.get("Content-Security-Policy").lower():
 					self.interesting.append(response.headers.get("Content-Security-Policy"))
-					sub_matches = re.findall(rf'[A-z-]*\.{self.base_domain}',response.headers.get("Content-Security-Policy"))
+					sub_matches = re.findall(rf'[A-z-]+\.{self.base_domain}',response.headers.get("Content-Security-Policy"))
+					if sub_matches:
+						print(response.headers.get("Content-Security-Policy"))
 					self.sub_domains.extend(sub_matches)
 				if response.headers.get("content-type") and "text/html" not in response.headers.get("content-type"):
 					if any(response.url.endswith(extension) for extension in self.file_extensions):
-						self.files.append(current_url)
+						self.files.append(current_url.split("#")[0])
 					elif any(response.headers.get("content-type") == content_type for content_type in self.file_content_types):
-						self.files.append(current_url)
+						self.files.append(current_url.split("#")[0])
 					elif any(response.headers.get("content-type") == content_type for content_type in self.interesting_content_types):
 						self.interesting.append(current_url)
 					elif response.headers.get("content-type") == "application/json":
@@ -287,6 +294,14 @@ class CreepyCrawler():
 					
 				response.close()
 				soup = BeautifulSoup(response_text,"lxml")
+
+				if self.js:
+					script_srcs = [script for script in soup.select("script") if script.get("src")]
+					for script in script_srcs:
+						if script.get("src").startswith("/"):
+							self.js_list.append(original_base_url + script.get("src"))
+						elif original_base_url in script.get("src"):
+							self.js_list.append(script.get("src"))
 
 				if soup.select('[type="password"]'):
 					self.login_pages.append(current_url)
@@ -470,7 +485,8 @@ class CreepyCrawler():
 			"tags":list(set(self.tags_list)),
 			"alerts":list(set(self.alerts)),
 			"json_endpoints":list(set(self.json_endpoints)),
-			"login_pages":list(set(self.login_pages))
+			"login_pages":list(set(self.login_pages)),
+			"js_list":list(set(self.js_list))
 		}
 
 
@@ -586,6 +602,12 @@ if __name__ == "__main__":
 		help="Return IP addresses extracted from crawled page content",
 		action="store_true"
 	)
+	parser.add_argument(
+		"--js",
+		required=False,
+		help="Return a list of local JS sources from crawled content",
+		action="store_true"
+	)
 	args = parser.parse_args()
 	if not args.access_key and args.secret_access_key:
 		sys.exit("When providing keys, provide both an access key and a secret access key.")
@@ -642,6 +664,10 @@ if __name__ == "__main__":
 		if results.get("tags"):
 			print(f"\nTags ({len(results.get('tags'))}):")
 			for item in results.get("tags"):
+				print(f"\t{item}")
+		if results.get("js_list"):
+			print(f"\nJS Sources ({len(results.get('js_list'))}):")
+			for item in results.get("js_list"):
 				print(f"\t{item}")
 		for alert in results.get("alerts"):
 			print(f"\nALERT:\t{alert}")
