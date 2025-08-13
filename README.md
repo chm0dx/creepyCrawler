@@ -13,6 +13,7 @@ OSINT tool to crawl a site and extract useful recon info.
     * A list of crawled site links
     * HTML comments
     * IP addresses
+    * Local JS sources
     * Marketing tags (UA,GTM, etc.)
     * 'Interesting' findings such as frame ancestors content and resources that return JSON content
  * Built-in FireProx to automatically create endpoints for each subdomain, rotate source IP, and cleanup at the end
@@ -62,7 +63,8 @@ OSINT tool to crawl a site and extract useful recon info.
       --comments            Return HTML comments extracted from crawled pages
       --tags                Return tags (UA,GTM,etc.) extracted from crawled pages
       --ips                 Return IP addresses extracted from crawled page content
-      --headless            Run in headless mode. Requires Playwright and deps (or use docker).
+      --headless            Run in headless mode. Requires Playwright and deps (or use docker)
+      --js                  Return a list of local JS sources from crawled content
 
 
 ![I bet you can hear the song in your head...](https://media.giphy.com/media/Lz1LMB0rTWhNIKZdmD/giphy.gif)
